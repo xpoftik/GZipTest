@@ -130,6 +130,8 @@ namespace GZipTest.Arch
 
         public ArchResult Interrupt() {
             _interrupt = true;
+            Status = ArchProcessStatus.Interrupted;
+
             return GetResult();
         }
 
@@ -184,6 +186,12 @@ namespace GZipTest.Arch
             if (Status == ArchProcessStatus.InProcess) {
                 Status = ArchProcessStatus.Success;
             }
+            if (Status == ArchProcessStatus.Interrupted || Status == ArchProcessStatus.Fault) {
+                //Try to remove file without any exceptions.
+                try {
+                    File.Delete(_archFilename);
+                } catch { }
+            }
         }
 
         void Reader(Object p)
@@ -191,6 +199,8 @@ namespace GZipTest.Arch
             var filename = (string)p;
             using (var stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)) {
                 while (true) {
+                    if (_interrupt) break;
+
                     if (ReadBuffer.Sum(b => b.Size) >= _readBufferSizeInBytes) {
                         //Console.WriteLine($"Reader thread went to bed. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
                         Thread.Sleep(10);
@@ -227,6 +237,8 @@ namespace GZipTest.Arch
         private void Compressor()
         {
             while (!_runToComplete || ReadBuffer.Count > 0) {
+                if (_interrupt) break;
+
                 if (ReadBuffer.TryDequeue(out Block block)) {
                     var index = block.Index;
                     int bytes;
@@ -285,6 +297,8 @@ namespace GZipTest.Arch
             var currentIndex = 0;
             var currentOffset = 0;
             while (currentIndex < _blocksCount) {
+                if (_interrupt) break;
+
                 if (CompressedBuffer.TryRemove(currentIndex, out Block block)) {
                     block.Offset = currentOffset;
                     currentOffset += block.Size;
@@ -305,6 +319,8 @@ namespace GZipTest.Arch
             var filename = (string)p;
             using (var stream = new FileStream(filename, FileMode.Open, FileAccess.Write, FileShare.Write)) {
                 while (!_runToComplete || ReadyToWrite.Count > 0) {
+                    if (_interrupt) break;
+
                     if (ReadyToWrite.TryDequeue(out Block block)) {
                         WriteBlock(stream, block.Payload, block.Offset, block.Size);
                     } else {
