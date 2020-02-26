@@ -20,13 +20,14 @@ namespace GZipTest
 
         private CompositionRoot() {
             _root = new ServiceCollection();
-            _root.AddLogging();
+            _root.AddLogging(configure => configure.AddConsole())
+                    .Configure<LoggerFilterOptions>(opt => opt.MinLevel = LogLevel.Information);
 
-            _root.AddSingleton<Archiver>(provider => {
+            _root.AddSingleton(provider => {
                 var logger = provider.GetService<ILogger<ArchiverWorker>>();
                 Func<string, string, ArchSettings, int, ArchiverWorker> factory =
-                (target, arch, settings, jobs) =>
-                    new ArchiverWorker(target, arch, settings, jobs, logger);
+                    (target, arch, settings, jobs) =>
+                        new ArchiverWorker(target, arch, settings, jobs, logger);
                 return new Archiver(factory);
             });
             _root.AddTransient<ArchiverWorker>();

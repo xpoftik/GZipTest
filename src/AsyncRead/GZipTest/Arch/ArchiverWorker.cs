@@ -24,8 +24,9 @@ namespace GZipTest.Arch
     {
         private object lockObject = new object();
 
-        private readonly ManualResetEvent readEvent = new ManualResetEvent(initialState: false);
-        private readonly ManualResetEvent compressEvent = new ManualResetEvent(initialState: false);
+        private readonly ManualResetEvent _readEvent = new ManualResetEvent(initialState: false);
+        private readonly ManualResetEvent _compressEvent = new ManualResetEvent(initialState: false);
+        private readonly ManualResetEvent _writeEvent = new ManualResetEvent(initialState: false);
 
         private readonly string _target;
         private readonly long _filesizeInBytes;
@@ -40,9 +41,9 @@ namespace GZipTest.Arch
         private readonly ConcurrentQueue<Block> ReadBuffer = new ConcurrentQueue<Block>();
         private readonly ConcurrentDictionary<long, Block> CompressedBuffer = new ConcurrentDictionary<long, Block>();
         private readonly ConcurrentQueue<Block> ReadyToWrite = new ConcurrentQueue<Block>();
-
+        private readonly ILogger<ArchiverWorker> _logger;
         private bool _runToComplete = false;
-        private int _counter = -1;
+        private int _blockIndex = -1;
         private int _blocksCount;
 
         private Thread[] _readers;
@@ -51,7 +52,7 @@ namespace GZipTest.Arch
         private Thread _offsetCalculator;
         private Thread _processThread;
 
-        private bool _interrupt = false;
+        private bool _isInterrupted = false;
         private List<Exception> _exceptions = new List<Exception>();
 
         public ArchiverWorker(string target, string archFilename, ArchSettings settings, int compressors, ILogger<ArchiverWorker> logger)
@@ -91,6 +92,7 @@ namespace GZipTest.Arch
             if (_writersCount == 0) {
                 _writersCount = 1;
             }
+            _logger = logger;
         }
 
         public ArchProcessStatus Status { get; private set; }
@@ -138,7 +140,7 @@ namespace GZipTest.Arch
         }
 
         public ArchResult Interrupt() {
-            _interrupt = true;
+            _isInterrupted = true;
             Status = ArchProcessStatus.Interrupted;
 
             return GetResult();
@@ -208,30 +210,47 @@ namespace GZipTest.Arch
             var filename = (string)p;
             using (var stream = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read)) {
                 while (true) {
-                    if (_interrupt) break;
+                    WaitIfReadBufferIsFull();
+                    if (_isInterrupted) break;
 
-                    if (ReadBuffer.Sum(b => b.Size) >= _readBufferSizeInBytes) {
-                        //Console.WriteLine($"Reader thread went to bed. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
-                        Thread.Sleep(10);
-                        continue;
-                    }
-
-                    var counterValue = Interlocked.Increment(ref _counter);
-                    var offset = counterValue * _blockSizeInBytes;
-
+                    int blockIndex, offset;
+                    (blockIndex, offset) = CalculateReadOffset();
                     if (offset > _filesizeInBytes) break;
 
-                    int readBytes;
-                    byte[] buffer;
-                    (readBytes, buffer) = ReadBlock(stream, offset, _blockSizeInBytes);
-                    var block = new Block(
-                        index: counterValue,
+                    try {
+                        int readBytes;
+                        byte[] buffer;
+                        (readBytes, buffer) = ReadBlock(stream, offset, _blockSizeInBytes);
+                        var block = new Block(
+                        index: blockIndex,
                         capacity: _blockSizeInBytes,
                         payload: buffer,
                         size: readBytes) ;
-                    ReadBuffer.Enqueue(block);
+                        ReadBuffer.Enqueue(block);
+                    } catch (Exception ex) {
+                        SetException(ex);
+                    } finally {
+                        //pulse compressor
+                        _compressEvent.Set();
+                    }
                 }
             }
+        }
+
+        private void WaitIfReadBufferIsFull() {
+            if (ReadBuffer.Sum(b => b.Size) >= _readBufferSizeInBytes) {
+                _logger.LogDebug($"Reader thread went to bed. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
+                _readEvent.Reset();
+                _readEvent.WaitOne();
+                _logger.LogDebug($"Reader thread woke up. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
+            }
+        }
+
+        private (int, int) CalculateReadOffset() {
+            var blockIndex = Interlocked.Increment(ref _blockIndex);
+            var offset = blockIndex * _blockSizeInBytes;
+
+            return (blockIndex, offset);
         }
 
         private (int, byte[]) ReadBlock(Stream stream, long offset, int bufferSize)
@@ -246,24 +265,38 @@ namespace GZipTest.Arch
         private void Compressor()
         {
             while (!_runToComplete || ReadBuffer.Count > 0) {
-                if (_interrupt) break;
+                if (_isInterrupted) break;
 
                 if (ReadBuffer.TryDequeue(out Block block)) {
-                    var index = block.Index;
-                    int bytes;
-                    byte[] compressed;
-                    (bytes, compressed) = CompressBlock(block.Payload, block.Size, CompressionLevel.Optimal);
-                    var compressedBlock = new Block(
+                    try {
+                        var index = block.Index;
+                        int bytes;
+                        byte[] compressed;
+                        (bytes, compressed) = CompressBlock(block.Payload, block.Size, _compressionLevel);
+                        var compressedBlock = new Block(
                         index,
                         capacity: bytes,
                         payload: compressed,
                         size: bytes);
-                    CompressedBuffer[index] = compressedBlock;
+
+                        CompressedBuffer[index] = compressedBlock;
+                    } catch (Exception ex) {
+                        SetException(ex);
+                    } finally {
+                        _writeEvent.Set();
+                    }
                 } else {
-                    //Console.WriteLine($"Compressor went to bed. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
-                    Thread.Sleep(10);
+                    _logger.LogDebug($"Compressor went to bed. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
+
+                    //pulse reader to read more blocks
+                    _readEvent.Set();
+                    _compressEvent.Reset();
+                    _compressEvent.WaitOne(millisecondsTimeout: 50);
+                        
+                    _logger.LogDebug($"Compressor woke up. ThreadId: {Thread.CurrentThread.ManagedThreadId}");
                 }
             }
+            _readEvent.Set();
         }
 
         static (int, byte[]) CompressBlock(byte[] data, int blockSize, CompressionLevel compression)
@@ -306,7 +339,7 @@ namespace GZipTest.Arch
             var currentIndex = 0;
             var currentOffset = 0;
             while (currentIndex < _blocksCount) {
-                if (_interrupt) break;
+                if (_isInterrupted) break;
 
                 if (CompressedBuffer.TryRemove(currentIndex, out Block block)) {
                     block.Offset = currentOffset;
@@ -315,12 +348,17 @@ namespace GZipTest.Arch
                     ReadyToWrite.Enqueue(block);
 
                     currentIndex++;
+
+                    _writeEvent.Set();
                 } else {
-                    //Console.WriteLine(currentIndex);
-                    //Console.WriteLine($"Calculator went bed. ThradId: {Thread.CurrentThread.ManagedThreadId}");
-                    Thread.Sleep(10);
+                    _logger.LogDebug($"Calculator went bed. ThradId: {Thread.CurrentThread.ManagedThreadId}");
+
+                    _compressEvent.WaitOne(10);
+
+                    _logger.LogDebug($"Calculator woke bed. ThradId: {Thread.CurrentThread.ManagedThreadId}");
                 }
             }
+            _writeEvent.Set();
         }
 
         private void Writer(Object p)
@@ -328,17 +366,24 @@ namespace GZipTest.Arch
             var filename = (string)p;
             using (var stream = new FileStream(filename, FileMode.Open, FileAccess.Write, FileShare.Write)) {
                 while (!_runToComplete || ReadyToWrite.Count > 0) {
-                    if (_interrupt) break;
+                    if (_isInterrupted) break;
 
                     if (ReadyToWrite.TryDequeue(out Block block)) {
-                        WriteBlock(stream, block.Payload, block.Offset, block.Size);
+                        try {
+                            WriteBlock(stream, block.Payload, block.Offset, block.Size);
+                        } catch (Exception ex) {
+                            SetException(ex);
+                        }
                     } else {
-                        //Console.WriteLine($"Writer got to bed. {Thread.CurrentThread.ManagedThreadId}");
-                        Thread.Sleep(10);
+                        _logger.LogDebug($"Writer went to bed. {Thread.CurrentThread.ManagedThreadId}");
+
+                        _writeEvent.Reset();
+                        _writeEvent.WaitOne(50);
+
+                        _logger.LogDebug($"Writer woke up. {Thread.CurrentThread.ManagedThreadId}");
                     }
                 }
                 stream.Flush();
-                //Console.WriteLine($"Writer done! ThreadId: {Thread.CurrentThread.ManagedThreadId}");
             }
         }
 
@@ -350,8 +395,9 @@ namespace GZipTest.Arch
 
         private void SetException(Exception ex) {
             lock (lockObject) {
+                Status = ArchProcessStatus.Fault;
                 _exceptions.Add(ex);
-                _interrupt = true;
+                _isInterrupted = true;
             }
         }
     }
