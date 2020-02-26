@@ -13,9 +13,17 @@ namespace GZipTest.Arch
         
         private readonly int _blockSizeInBytes;
         private readonly int _readBufferSizeInBytes;
+        private readonly Func<string, string, ArchSettings, int, ArchiverWorker> _factory;
 
-        public Archiver(int blockSizeInBytes = DEFAULT_BLOCK_SIZE, int readBufferSizeInBytes = DEFAULT_READ_BUFFER_SIZE)
+        public Archiver(
+            Func<string, string, ArchSettings, int, ArchiverWorker> factory,
+            int blockSizeInBytes = DEFAULT_BLOCK_SIZE,
+            int readBufferSizeInBytes = DEFAULT_READ_BUFFER_SIZE)
         {
+            if (factory is null) {
+                throw new ArgumentNullException(nameof(factory));
+            }
+            
             if (blockSizeInBytes <= 0) {
                 _blockSizeInBytes = DEFAULT_BLOCK_SIZE;
             } else {
@@ -26,9 +34,10 @@ namespace GZipTest.Arch
             } else {
                 _readBufferSizeInBytes = readBufferSizeInBytes;
             }
+            _factory = factory;
         }
 
-        public ArchiverWorker Arch(string target, string archFilename, CompressionLevel compression = CompressionLevel.Optimal, int jobs = -1) {
+        public ArchiverWorker Arch(string target, string archFilename, CompressionLevel compressionLevel = CompressionLevel.Optimal, int jobs = -1) {
             if (String.IsNullOrWhiteSpace(target)) {
                 throw new ArgumentNullException(nameof(target));
             }
@@ -41,7 +50,9 @@ namespace GZipTest.Arch
             if (jobs < 0) {
                 jobs = Environment.ProcessorCount;
             }
-            var process = new ArchiverWorker(target, archFilename, _blockSizeInBytes, _readBufferSizeInBytes, compressors: jobs);
+            var settings = new ArchSettings(_blockSizeInBytes, _readBufferSizeInBytes, compressionLevel);
+            //var process = new ArchiverWorker(target, archFilename, _blockSizeInBytes, _readBufferSizeInBytes, compressors: jobs);
+            var process = _factory(target, archFilename, settings, jobs);
             process.Start();
 
             return process;

@@ -1,4 +1,5 @@
 ﻿using GZipTest.Utils;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,11 +24,15 @@ namespace GZipTest.Arch
     {
         private object lockObject = new object();
 
+        private readonly ManualResetEvent readEvent = new ManualResetEvent(initialState: false);
+        private readonly ManualResetEvent compressEvent = new ManualResetEvent(initialState: false);
+
         private readonly string _target;
         private readonly long _filesizeInBytes;
         private readonly string _archFilename;
         private readonly int _blockSizeInBytes;
         private readonly int _readBufferSizeInBytes;
+        private readonly CompressionLevel _compressionLevel;
         private readonly int _compressorsCount;
         private readonly int _readersCount;
         private readonly int _writersCount;
@@ -49,7 +54,7 @@ namespace GZipTest.Arch
         private bool _interrupt = false;
         private List<Exception> _exceptions = new List<Exception>();
 
-        public ArchiverWorker(string target, string archFilename, int blockSizeInBytes, int readBufferSizeInBytes, int compressors)
+        public ArchiverWorker(string target, string archFilename, ArchSettings settings, int compressors, ILogger<ArchiverWorker> logger)
         {
             if (String.IsNullOrWhiteSpace(target)) {
                 throw new ArgumentNullException(nameof(target));
@@ -61,12 +66,16 @@ namespace GZipTest.Arch
             if (!File.Exists(target)) {
                 throw new FileNotFoundException("File not found.", target);
             }
+
+            int blockSizeInBytes = settings.BlockSizeInBytes;
+            int readBufferSizeInBytes = settings.ReadBufferSizeInBytes;
             if (blockSizeInBytes <= 0) {
                 throw new ArgumentException($"{nameof(blockSizeInBytes)} must be positive and greater than zero.");
             }
             if (readBufferSizeInBytes <= 0) {
                 throw new ArgumentException($"{nameof(readBufferSizeInBytes)} must be positive and greater than zero.");
             }
+            _compressionLevel = settings.CompressionLevel;
 
             _target = target;
             _filesizeInBytes = (new FileInfo(_target)).Length;

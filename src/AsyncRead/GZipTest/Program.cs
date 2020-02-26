@@ -12,14 +12,13 @@ namespace GZipTest
 
             var target = "C:\\test\\test.txt";
             var archFilename = Path.Combine("C:\\test\\", $"{Guid.NewGuid().ToString()}.gz");
-            var process = archiver.Arch(target, archFilename, jobs: Environment.ProcessorCount);
             try {
-                var result = process.Result;
-                if (result.IsSuccess) {
+                var process = archiver.Arch(target, archFilename, jobs: Environment.ProcessorCount);
+                if (process.Result.IsSuccess) {
                     Console.WriteLine(0);
                 } else {
                     Console.WriteLine(1);
-                    if (result.IsInterrupted) {
+                    if (process.Result.IsInterrupted) {
                         Console.WriteLine("Interrupted by user.");
                     }
                 }
