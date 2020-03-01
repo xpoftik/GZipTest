@@ -4,13 +4,9 @@ using System.Text;
 
 namespace GZipTest.Arch
 {
-    internal sealed class Archiver
+    public interface IArchProcess
     {
-        public Archiver()
-        {
-
-        }
-
         
+        IArchResult Result { get; }
     }
 }

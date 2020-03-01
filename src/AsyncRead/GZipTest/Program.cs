@@ -1,4 +1,4 @@
-﻿using GZipTest.Utils;
+﻿using GZipTest.Arch;
 using System;
 using System.IO;
 using System.Threading;
@@ -9,35 +9,27 @@ namespace GZipTest
     {
         static void Main(string[] args)
         {
-            var archiver = CompositionRoot.Current.GetArchiver();
+            var scheduler = new SimpleAchScheduler(threadCount: Environment.ProcessorCount);
 
-            var target = "C:\\test\\bigfile.txt";
-            var archFilename = Path.Combine("C:\\test\\", $"{Guid.NewGuid().ToString()}.gz");
-            try {
-                var process = archiver.Arch(target, archFilename, jobs: Environment.ProcessorCount);
-                if (process.Result.IsSuccess) {
-                    Console.WriteLine(0);
-                } else {
-                    Console.WriteLine(1);
-                    if (process.Result.IsInterrupted) {
-                        Console.WriteLine("Interrupted by user.");
+            var filename = Path.Combine("C:\\test", "bigfile.txt");
+            var reader = new FileReader(filename, scheduler);
+            var bufferReader = new BufferReader(reader, Consts.DEFAULT_BUFFER_SIZE_LIMIT, scheduler);
+
+            bool stop = false;
+            while (!stop) {
+                var w1 = bufferReader.ReadAsync(block => {
+                    if(!stop && block.Index == -1) {
+                        stop = true;
                     }
-                }
-            } catch (ArchProcessFailedException fail) {
-                Console.WriteLine(fail.Message);
-                if (fail.InnerException is AggregateException) {
-                    var inner = (fail.InnerException as AggregateException).Flatten();
-                    Console.WriteLine(inner.Message);
-                } else {
-                    var inner = fail.InnerException;
-                    while (inner != null) {
-                        Console.WriteLine(inner.Message);
-                        inner = inner.InnerException;
-                    }
-                }
-            } catch (Exception ex) {
-                Console.WriteLine(ex.Message);
+                    Console.WriteLine($"{block.Index} ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cancellationToken: CancellationToken.None);
+                var w2 = bufferReader.ReadAsync(block => { Console.WriteLine($"{block.Index} ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cancellationToken: CancellationToken.None);
+                var w3 = bufferReader.ReadAsync(block => { Console.WriteLine($"{block.Index} ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cancellationToken: CancellationToken.None);
+                var w4 = bufferReader.ReadAsync(block => { Console.WriteLine($"{block.Index} ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cancellationToken: CancellationToken.None);
+                var w5 = bufferReader.ReadAsync(block => { Console.WriteLine($"{block.Index} ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cancellationToken: CancellationToken.None);
+
+                WaitHandle.WaitAll(new WaitHandle[] { w1, w2, w3, w4, w5 });
             }
+            Console.WriteLine("1111111111111111111111111111");
         }
     }
 }

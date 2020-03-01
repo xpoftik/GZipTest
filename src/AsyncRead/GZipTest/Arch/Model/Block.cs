@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace GZipTest.Arch
+namespace GZipTest.Arch.Model
 {
     internal sealed class Block
     {
@@ -12,14 +12,15 @@ namespace GZipTest.Arch
             Capacity = capacity;
             Payload = payload;
             Size = size;
-            Offset = -1;
+        }
+
+        public static Block NullBlock() {
+            return new Block(-1, 0, new byte[0], 0);
         }
 
         public int Index { get; }
         public int Capacity { get; }
-        public int Size { get; set; }
+        public int Size { get; }
         public byte[] Payload { get; }
-        
-        public int Offset { get; set; }
     }
 }
