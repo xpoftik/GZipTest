@@ -121,5 +121,65 @@ public static class ThrowIf
                 throw new ArgumentException(message, argName);
             }
         }
+
+        /// <summary>
+        /// Throws an exception if value is less than zero.
+        /// 
+        /// </summary>
+        /// <param name="value">Argument value.</param>
+        /// <param name="argName">Argument name.</param>
+        /// <param name="message">Custom message.</param>
+        public static void LessThanZero(long value, string argName, string message = "Argument must be greater or equals zero.")
+        {
+            if (value < 0) {
+                throw new ArgumentException(message, argName);
+            }
+        }
+
+        /// <summary>
+        /// Throws an exception if value is less or equals zero.
+        /// 
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="argName"></param>
+        /// <param name="message"></param>
+        public static void LessOrEqualZero(long value, string argName, string message = "Argument must be greater than zero.")
+        {
+            if (value <= 0) {
+                throw new ArgumentException(message, argName);
+            }
+        }
+
+        /// <summary>
+        /// Throws an exception if value is more than maxValue.
+        /// 
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="maxValue"></param>
+        /// <param name="argName"></param>
+        /// <param name="message"></param>
+        public static void MoreThan(long value, long maxValue, string argName, string message = "Argument must be less than {0}.")
+        {
+            message = String.Format(message, maxValue);
+            if (value > maxValue) {
+                throw new ArgumentException(message, argName);
+            }
+        }
+
+        /// <summary>
+        /// Throws an exception if value is more than or equal maxValue .
+        /// 
+        /// </summary>
+        /// <param name="value"></param>
+        /// <param name="maxValue"></param>
+        /// <param name="argName"></param>
+        /// <param name="message"></param>
+        public static void MoreThanOrEqual(long value, long maxValue, string argName, string message = "Argument must be less than {0}.")
+        {
+            message = String.Format(message, maxValue);
+            if (value >= maxValue) {
+                throw new ArgumentException(message, argName);
+            }
+        }
     }
 }

@@ -9,24 +9,25 @@ namespace GZipTest.Arch
     internal interface IArchScheduler
     {
         WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback);
-        WaitHandle ScheduleWorkItem(Action workItem, Action callback);
+        WaitHandle ScheduleWorkItem(Action workItem, Action callback = null);
     }
 
     internal sealed class SimpleAchScheduler : IArchScheduler {
 
         private object _locker = new object();
+        //private object _schedulingLocker = new object();
+        //private bool _isScheduling = false;
 
-        private ConcurrentQueue<ThreadWrapper> _threads = new ConcurrentQueue<ThreadWrapper>();
-        //We have to you queue to avoid cases cyclic performing rescheduled item!
+        private ConcurrentQueue<ThreadWrapper> _threadPool = new ConcurrentQueue<ThreadWrapper>();
+        //We have to use queue to avoid cases cyclic performing rescheduled item!
         private Queue<Action> _queue = new Queue<Action>();
 
-        public SimpleAchScheduler(int threadCount = 4)
+        public SimpleAchScheduler(int threadsCount = 4)
         {
-            InitThreadsPool(threadCount);
+            InitThreadPool(threadsCount);
             BeginSchedulling();
         }
 
-        //TODO: ЧТО ДЕЛАТЬ С ЭКСЕПШЕНАМИ?
         public WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback)
         {
             ThrowIf.Argument.IsNull(workItem, nameof(workItem));
@@ -35,7 +36,7 @@ namespace GZipTest.Arch
             Action threadStart = () => {
                 try{
                     var result = workItem();
-                    //TODO: we could schedule invocation of callback via scheduler.
+                    //We could schedule invocation of callback via scheduler.
                     callback?.Invoke(result);
                 } finally {
                     waitHandle.Set();
@@ -46,7 +47,7 @@ namespace GZipTest.Arch
             return waitHandle;
         }
 
-        public WaitHandle ScheduleWorkItem(Action workItem, Action callback)
+        public WaitHandle ScheduleWorkItem(Action workItem, Action callback = null)
         {
             ThrowIf.Argument.IsNull(workItem, nameof(workItem));
 
@@ -54,7 +55,7 @@ namespace GZipTest.Arch
             Action threadStart = () => {
                 try{
                     workItem();
-                    //TODO: we could schedule invocation of callback via scheduler.
+                    //We could schedule invocation of callback via scheduler.
                     callback?.Invoke();
                 } finally {
                     waitHandle.Set();
@@ -65,10 +66,6 @@ namespace GZipTest.Arch
             return waitHandle;
         }
 
-        //public void RescheduleWorkItem(Action workItem, Action callback, WaitHandle waitHandle) { 
-            
-        //}
-
         private void SchedulePreparedWorkItem(Action threadStart)
         {
             lock (_locker) {
@@ -76,48 +73,32 @@ namespace GZipTest.Arch
             }
         }
 
-        private void InitThreadsPool(int initialCount) {
+        private void InitThreadPool(int initialCount) {
             for (int idx = 0; idx < initialCount; idx++) {
-                _threads.Enqueue(new ThreadWrapper());
+                _threadPool.Enqueue(new ThreadWrapper());
             }
         }
 
-        //TODO: Transform it to StateMachine
         private void BeginSchedulling()
         {
             var schedulingThread = new Thread(() => {
-                //TODO: Do we have to stop this thread somehow?
                 while(true) {
-                    if (_threads.Count > 0) {
-                        if(TryDequeueNextWorkItem(out Action nextItem)){
-                            if(_threads.TryDequeue(out ThreadWrapper thread)) {
-                                //Console.WriteLine($"Queue length: {_queue.Count}");
+                    if (_threadPool.Count > 0) {
+                        if(TryDequeueNextWorkItem(out Action nextItem)) {
+                            if(_threadPool.TryDequeue(out ThreadWrapper thread)) {
+                                //Console.Write($"\r Queue length: {_queue.Count}");
                                 Action nextItemWrapper = () => {
                                     try {
                                         nextItem();
                                     }
                                     finally {
-                                        _threads.Enqueue(thread);
+                                        _threadPool.Enqueue(thread);
                                     }
                                 };
                                 thread.Start(nextItemWrapper);
                             } else {
                                 SchedulePreparedWorkItem(nextItem);
                             }
-                            //var thread = _threads.Dequeue();
-                            //if(thread != null) {
-                            //    Action nextItemWrapper = () => {
-                            //        try {
-                            //            nextItem();
-                            //        }
-                            //        finally {
-                            //            _threads.Enqueue(thread);
-                            //        }
-                            //    };
-                            //    thread.Start(nextItemWrapper);
-                            //} else {
-                            //    SchedulePreparedWorkItem(nextItem);
-                            //}
                         }
                     }
                 }

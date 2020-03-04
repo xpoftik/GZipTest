@@ -1,5 +1,6 @@
 ﻿using GZipTest.Arch.Abstract;
 using GZipTest.Arch.Model;
+using GZipTest.Arch.Results;
 using GZipTest.Utils;
 using System;
 using System.Collections.Generic;
@@ -39,28 +40,64 @@ namespace GZipTest.Arch
             _blockSizeInBytes = blockSize;
         }
 
-        public WaitHandle ReadAsync(Action<Block> callback, CancellationToken cancellationToken)
+        public WaitHandle ReadAsync(Action<IAsyncResult<Block>> callback, CancellationToken cancellationToken)
         {
-            var waitHandle = _scheduler.ScheduleWorkItem(() => {
-                cancellationToken.ThrowIfCancellationRequested();
-                
-                var stream = GetStream();
-                try {
-                    var index = Interlocked.Increment(ref _counter);
-                    var offset = (long)index * _blockSizeInBytes;
-
-                    var block = ReadBlock(stream, index, offset);
-
-                    return block;
-                } finally {
-                    TakeBackStream(stream);
+            var waitHandle = new ManualResetEvent(initialState: false);
+            Action<int, CancellationToken> readStateMachine = null;
+            Block block = null;
+            Exception exception = null;
+            readStateMachine = (state, token) => {
+                if (token.IsCancellationRequested) {
+                    waitHandle.Set();
+                    return;
                 }
-            },
-            _block => callback(_block));
 
+                switch (state) {
+                    case 0:
+                        var blockIdx = GetNextBlockIndex();
+                        var offset = (long)blockIdx * _blockSizeInBytes;
+                        _scheduler.ScheduleWorkItem(
+                            workItem: () => {
+                                try {
+                                    block = ReadBlock(blockIdx, offset);
+                                } catch (Exception ex) {
+                                    exception = ex;
+                                }
+                            },
+                            callback: () => {
+                                if (block != null) {
+                                    readStateMachine(1, token);
+                                } else {
+                                    readStateMachine(2, token);
+                                }
+                            });
+
+                        break;
+                    case 1: // success
+                        _scheduler.ScheduleWorkItem(
+                            workItem: () => callback(new ValueResult<Block>(block, waitHandle)),
+                            callback: () => readStateMachine(3, token));
+                        break;
+                    case 2: // exception
+                        _scheduler.ScheduleWorkItem(
+                            workItem: () => callback(new ExceptionResult<Block>(exception, waitHandle)),
+                            callback: () => readStateMachine(3, token));
+                        break;
+                    case 3: // finalizing
+                        RemoveAwaiter(waitHandle);
+                        waitHandle.Set();
+                        break;
+                }
+            };
+
+            _scheduler.ScheduleWorkItem(() => readStateMachine(0, cancellationToken), callback: null);
             StoreAwaiter(waitHandle);
 
             return waitHandle;
+        }
+
+        private int GetNextBlockIndex() {
+            return Interlocked.Increment(ref _counter);
         }
 
         private void StoreAwaiter(WaitHandle awaiter)
@@ -70,7 +107,6 @@ namespace GZipTest.Arch
             }
         }
 
-        //TODO: Remove this method or use!
         private void RemoveAwaiter(WaitHandle awaiter) {
             lock (_locker) {
                 _awaiters.Remove(awaiter);
@@ -95,26 +131,36 @@ namespace GZipTest.Arch
 
         private Stream CreateNewStream(string filename)
         {
-            return new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: Environment.SystemPageSize, options: FileOptions.RandomAccess);
         }
 
-        private Block ReadBlock(Stream stream, int index, long offset) {
-            byte[] buffer = new byte[_blockSizeInBytes];
-            stream.Position = offset;
-            var readBytes = stream.Read(buffer, offset: 0, count: _blockSizeInBytes);
-            Block block;
-            if (readBytes == 0) {
-                block = Block.NullBlock();
-            } else {
-                block = new Block(index, capacity: _blockSizeInBytes, payload: buffer, size: readBytes);
+        private Block ReadBlock(int index, long offset) {
+            var stream = GetStream();
+            try {
+                //if (index > 100) {
+                //    throw new Exception("TEST EXCEPTION!!!");
+                //}
+
+                byte[] buffer = new byte[_blockSizeInBytes];
+                stream.Position = offset;
+                var readBytes = stream.Read(buffer, offset: 0, count: _blockSizeInBytes);
+                Block block;
+                if (readBytes == 0) {
+                    block = Block.NullBlock();
+                } else {
+                    block = new Block(index, capacity: _blockSizeInBytes, payload: buffer, size: readBytes);
+                }
+                return block;
+            } finally {
+                TakeBackStream(stream);
             }
-            return block;
         }
 
         protected override void DisposeCore()
         {
-            //TODO: дождаться пока все запланированные операции будут выполнены, затем закрыть все потоки из пула, очистить пул.
-            WaitHandle.WaitAll(_awaiters.ToArray());
+            if (_awaiters.Count > 0) {
+                WaitHandle.WaitAll(_awaiters.ToArray());
+            }
             for (int counter = 0; counter < _handlersPool.Count; counter++) {
                 var handler = _handlersPool.Pop();
                 handler?.Dispose();
