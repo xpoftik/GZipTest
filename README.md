@@ -10,10 +10,10 @@ Options:
   -?|-h|--help
   
 Compress:
-GZipTest.exe -m compress -t <target filename> -o <output filename>
+GZipTest.exe -m compress -t target_filename -o output_filename
 
 Decompress: 
-GZipTest.exe -m decompress -t <target filename> -o <output filename>
+GZipTest.exe -m decompress -t target_filename -o output_filename
 
 Archiver is built on classical pattern pub/sub.
 Compressor and decompressor implemented as a decorator and just wrap internal stream. Every async method imlemented as a state machine, as a result we have non blocking async operations.
