@@ -49,13 +49,6 @@ namespace GZipTest.Arch
             Exception exception = null ;
             Block block = null ;
             readStateMachine = (state, token) => {
-                //Console.WriteLine($"Reading state machine: {state}");
-                //if (token.IsCancellationRequested) {
-                //    Console.WriteLine("%%%%%%%%%%%%%%%%555555555555555555555555555555555555");
-                //    waitHandle.Set();
-                //    return;
-                //}
-
                 switch (state) {
                     case 0:
                         if (_isFaulted) {
@@ -169,8 +162,6 @@ namespace GZipTest.Arch
                 return waitHandle;
             }
         }
-
-
         private void Enqueue(Block block) {
             lock (_locker) {
                 _buffer.Enqueue(block);

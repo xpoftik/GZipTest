@@ -48,8 +48,6 @@ namespace GZipTest.Arch
             Exception exception = null;
             readStateMachine = (state, token) => {
                 if (token.IsCancellationRequested) {
-
-                    Console.WriteLine("RERERERERERERER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     RemoveAwaiter(waitHandle);
                     waitHandle.Set();
 
