@@ -16,4 +16,4 @@ Decompress:
 GZipTest.exe -m decompress -t <target filename> -o <output filename>
 
 Archiver is built on classical pattern pub/sub.
-Compressor and decompressor implemented as a decorator and just wrap internal stream.
+Compressor and decompressor implemented as a decorator and just wrap internal stream. Every async method imlemented as a state machine, as a result we have non blocking async operations.
