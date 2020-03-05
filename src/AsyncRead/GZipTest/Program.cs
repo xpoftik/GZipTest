@@ -37,19 +37,19 @@ namespace GZipTest
             }
 
             var cls = new CancellationTokenSource();
-            var cancellationSpinner = new Thread(()=>{
-                Console.WriteLine("Press 'Esc' to cancel operation.");
-                while(!cls.IsCancellationRequested){
-                    if(_done) break;
+            //var cancellationSpinner = new Thread(()=>{
+            //    Console.WriteLine("Press 'Esc' to cancel operation.");
+            //    while(!cls.IsCancellationRequested){
+            //        if(_done) break;
 
-                    var key = Console.ReadKey();
-                    if(key.Key == ConsoleKey.Escape){
-                        cls.Cancel();
-                        Console.WriteLine("Operation cancelled.");
-                    }
-                }
-            });
-            cancellationSpinner.Start();
+            //        var key = Console.ReadKey();
+            //        if(key.Key == ConsoleKey.Escape){
+            //            cls.Cancel();
+            //            Console.WriteLine("Operation cancelled.");
+            //        }
+            //    }
+            //});
+            //cancellationSpinner.Start();
 
             IArchProcess process = null;
             if (Mode.ToLower() == "compress") {
@@ -58,16 +58,31 @@ namespace GZipTest
                 process = Decompress(TargetFilename, OutputFilename, cls.Token);
             }
 
-            try {
-                var result = process.Result;
+            var processing = new Thread(()=>{
+                try {
+                    var result = process.Result;
+                    Console.WriteLine(result.Status);
 
-                Console.WriteLine(result.Status);
+                    _done = true;
+                } catch(Exception ex) {
+                    while (ex != null) {
+                        Console.WriteLine(ex);
+                        ex = ex.InnerException;
+                    }
+                }
+            });
+            processing.Start();
 
-                _done = true;
-            } catch(Exception ex) {
-                while (ex != null) {
-                    Console.WriteLine(ex);
-                    ex = ex.InnerException;
+            Console.WriteLine("Press 'Ctrl+C' to cancel the operation.");
+            while (!cls.IsCancellationRequested) {
+                if (_done) break;
+
+                var key = Console.ReadKey();
+                if (key.Key == ConsoleKey.Escape 
+                    || ((key.Modifiers == ConsoleModifiers.Control)
+                         && key.Key == ConsoleKey.C)) {
+                    cls.Cancel();
+                    Console.WriteLine("Operation cancelled.");
                 }
             }
         }
