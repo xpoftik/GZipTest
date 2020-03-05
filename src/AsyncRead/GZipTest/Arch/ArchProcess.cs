@@ -7,6 +7,10 @@ using System.Threading;
 
 namespace GZipTest.Arch
 {
+    /// <summary>
+    /// Arch process wrapper.
+    /// 
+    /// </summary>
     internal sealed class ArchProcess: IArchProcess
     {
         private enum States { 

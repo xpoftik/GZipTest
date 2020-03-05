@@ -34,32 +34,19 @@ namespace GZipTest
         {
             if (!File.Exists(TargetFilename)) {
                 Console.WriteLine($"Target file not found. Filename: {new FileInfo(TargetFilename).FullName}");
+                return;
             }
 
             var cls = new CancellationTokenSource();
-            //var cancellationSpinner = new Thread(()=>{
-            //    Console.WriteLine("Press 'Esc' to cancel operation.");
-            //    while(!cls.IsCancellationRequested){
-            //        if(_done) break;
-
-            //        var key = Console.ReadKey();
-            //        if(key.Key == ConsoleKey.Escape){
-            //            cls.Cancel();
-            //            Console.WriteLine("Operation cancelled.");
-            //        }
-            //    }
-            //});
-            //cancellationSpinner.Start();
-
-            IArchProcess process = null;
-            if (Mode.ToLower() == "compress") {
-                process = Compress(TargetFilename, OutputFilename, cls.Token);
-            } else {
-                process = Decompress(TargetFilename, OutputFilename, cls.Token);
-            }
-
             var processing = new Thread(()=>{
                 try {
+                    IArchProcess process = null;
+                    if (Mode.ToLower() == "compress") {
+                        process = Compress(TargetFilename, OutputFilename, cls.Token);
+                    } else {
+                        process = Decompress(TargetFilename, OutputFilename, cls.Token);
+                    }
+
                     var result = process.Result;
                     Console.WriteLine(result.Status);
 
@@ -73,7 +60,7 @@ namespace GZipTest
             });
             processing.Start();
 
-            Console.WriteLine("Press 'Ctrl+C' to cancel the operation.");
+            Console.WriteLine("Press 'Esc' to cancel the operation.");
             while (!cls.IsCancellationRequested) {
                 if (_done) break;
 

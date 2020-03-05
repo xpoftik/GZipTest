@@ -10,13 +10,11 @@ namespace GZipTest.Arch
     internal sealed class Archiver
     {
         public IArchProcess CompressAsync(string target, string output, CancellationToken cancellationToken) {
-
-
             var scheduler = new SimpleAchScheduler(threadsCount: Environment.ProcessorCount);
 
             var reader = new FileReader(target, scheduler);
             var bufferReader = new BufferReader(reader, Consts.DEFAULT_BUFFER_SIZE_LIMIT, scheduler);
-            var compressor = new Compressor(bufferReader, System.IO.Compression.CompressionLevel.Optimal, scheduler);
+            var compressor = new BlockCompressor(bufferReader, System.IO.Compression.CompressionLevel.Optimal, scheduler);
 
             var writer = new FileWriter(output, scheduler);
 

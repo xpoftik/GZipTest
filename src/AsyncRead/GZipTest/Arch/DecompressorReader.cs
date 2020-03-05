@@ -11,6 +11,10 @@ using System.Threading;
 
 namespace GZipTest.Arch
 {
+    /// <summary>
+    /// Async decompress file reader.
+    /// 
+    /// </summary>
     internal sealed class DecompressorReader: DisposableObject, IReader<Block>, IDisposable
     {
         private object _locker = new object();

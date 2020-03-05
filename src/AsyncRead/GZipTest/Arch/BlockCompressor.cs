@@ -12,7 +12,11 @@ using GZipTest.Arch.Results;
 
 namespace GZipTest.Arch
 {
-    internal sealed class Compressor : DisposableObject, IReader<Block>, IDisposable
+    /// <summary>
+    /// Async block compressor.
+    /// 
+    /// </summary>
+    internal sealed class BlockCompressor : DisposableObject, IReader<Block>, IDisposable
     {
         private enum States { 
             Start,
@@ -27,7 +31,7 @@ namespace GZipTest.Arch
         private readonly CompressionLevel _compressionLevel;
         private readonly IArchScheduler _scheduler;
 
-        public Compressor(IReader<Block> reader, CompressionLevel compressionLevel, IArchScheduler archScheduler)
+        public BlockCompressor(IReader<Block> reader, CompressionLevel compressionLevel, IArchScheduler archScheduler)
         {
             ThrowIf.Argument.IsNull(reader, nameof(reader));
             ThrowIf.Argument.IsNull(archScheduler, nameof(archScheduler));

@@ -10,6 +10,10 @@ using System.Threading;
 
 namespace GZipTest.Arch
 {
+    /// <summary>
+    /// Async file wrapper.
+    /// 
+    /// </summary>
     internal sealed class FileWriter: DisposableObject, IWriter<Block>, IDisposable
     {
         private enum States { 

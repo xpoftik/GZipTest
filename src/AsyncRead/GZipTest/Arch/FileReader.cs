@@ -11,7 +11,7 @@ using System.Threading;
 namespace GZipTest.Arch
 {
     /// <summary>
-    /// File reader.
+    /// Async file reader.
     /// 
     /// </summary>
     internal sealed class FileReader : DisposableObject, IReader<Block>, IDisposable
