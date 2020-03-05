@@ -88,34 +88,6 @@ namespace GZipTest.Arch
             StoreAwaiter(waitHandle);
 
             return waitHandle;
-
-            //Action<int> writer = null;
-            //WaitHandle waitHandle = null;
-            //writer = state => {
-            //    switch (state) {
-            //        case 0:
-            //            var stream = GetStream();
-            //            try {
-            //                WriteBlock(stream, block.Payload, offset, block.Size);
-            //            } finally {
-            //                TakeBackStream(stream);
-            //                RemoveAwaiter(waitHandle);
-            //            }
-            //            _scheduler.ScheduleWorkItem(() => writer(1), callback: null);
-
-            //            break;
-            //        case 1:
-            //            if (callback != null) {
-            //                _scheduler.ScheduleWorkItem(() => callback(block), callback: null);
-            //            }
-            //            break;
-            //    }
-            //};
-            //waitHandle = _scheduler.ScheduleWorkItem(() => writer(0), callback: null);
-
-            //StoreAwaiter(waitHandle);
-
-            //return waitHandle;
         }
 
         private void StoreAwaiter(WaitHandle awaiter)
