@@ -137,7 +137,7 @@ namespace GZipTest.Arch
         private Block ReadBlock(int index, long offset) {
             var stream = GetStream();
             try {
-                //if (index > 100) {
+                //if (index > 10) {
                 //    throw new Exception("TEST EXCEPTION!!!");
                 //}
 

@@ -22,6 +22,7 @@ namespace GZipTest.Arch
 
         private object _locker = new object();
         private int _requestCount = 0;
+        private bool _stop = false;
         //private object _schedulingLocker = new object();
         //private bool _isScheduling = false;
 
@@ -95,7 +96,10 @@ namespace GZipTest.Arch
                             _queue.Clear();
                             thread.Pulse();
                         }
+                        break;
                     }
+                    if(_stop) break;
+
                     if (_threadPool.Count > 0) {
                         if(TryDequeueNextWorkItem(out Action nextItem)) {
                             Interlocked.Increment(ref _requestCount);
@@ -117,6 +121,7 @@ namespace GZipTest.Arch
                         }
                     }
                 }
+                //Console.WriteLine("Scheduling thread terminated");
             });
             schedulingThread.Start();
         }
@@ -129,6 +134,7 @@ namespace GZipTest.Arch
             foreach (var thread in _threadPool) {
                 thread.Dispose();
             }
+            _stop = true;
             _threadPool.Clear();
         }
 
@@ -173,7 +179,7 @@ namespace GZipTest.Arch
 
                         _workItem();
                     }
-                    Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
+                    //Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
                 });
                 _targetThread.Start();
             }
