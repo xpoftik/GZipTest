@@ -23,8 +23,6 @@ namespace GZipTest.Arch
         private object _locker = new object();
         private int _requestCount = 0;
         private bool _stop = false;
-        //private object _schedulingLocker = new object();
-        //private bool _isScheduling = false;
 
         public int ThreadCount { get { return _threadPool.Count; } }
 
@@ -32,10 +30,10 @@ namespace GZipTest.Arch
         //We have to use queue to avoid cases cyclic performing rescheduled item!
         private Queue<Action> _queue = new Queue<Action>();
 
-        public SimpleAchScheduler(int threadsCount = 4/*, CancellationToken cancellationToken = default*/)
+        public SimpleAchScheduler(int threadsCount = 4)
         {
-            InitThreadPool(threadsCount/*, cancellationToken*/);
-            BeginSchedulling(/*cancellationToken*/);
+            InitThreadPool(threadsCount);
+            BeginSchedulling();
         }
 
         public WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback)
@@ -83,9 +81,9 @@ namespace GZipTest.Arch
             }
         }
 
-        private void InitThreadPool(int initialCount/*, CancellationToken cancellationToken*/) {
+        private void InitThreadPool(int initialCount) {
             for (int idx = 0; idx < initialCount; idx++) {
-                _threadPool.Enqueue(new ThreadWrapper(/*cancellationToken*/));
+                _threadPool.Enqueue(new ThreadWrapper());
             }
         }
 
