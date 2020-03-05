@@ -50,9 +50,11 @@ namespace GZipTest.Arch
             Block block = null ;
             readStateMachine = (state, token) => {
                 //Console.WriteLine($"Reading state machine: {state}");
-                if (token.IsCancellationRequested) {
-                    return;
-                }
+                //if (token.IsCancellationRequested) {
+                //    Console.WriteLine("%%%%%%%%%%%%%%%%555555555555555555555555555555555555");
+                //    waitHandle.Set();
+                //    return;
+                //}
 
                 switch (state) {
                     case 0:
@@ -118,11 +120,6 @@ namespace GZipTest.Arch
                 Block block = null;
                 Exception exception = null;
                 bufferingStateMachine = (state, token) => {
-                    //Console.WriteLine($"Buffering state: {state}");
-                    if (token.IsCancellationRequested) {
-                        return;
-                    }
-
                     switch (state) {
                         case 0:
                             _reader.ReadAsync(asyncResult => {

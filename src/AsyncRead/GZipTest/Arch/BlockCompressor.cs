@@ -50,11 +50,6 @@ namespace GZipTest.Arch
             Block compressedBlock = null;
             Exception exception = null;
             readerStateMachine = (state, token) => {
-                if (token.IsCancellationRequested) {
-                    waitHandle.Set();
-                    return;
-                }
-
                 switch (state) {
                     case States.Start:
                         _reader.ReadAsync(blockAsyncResult => {
@@ -104,36 +99,6 @@ namespace GZipTest.Arch
             _scheduler.ScheduleWorkItem(() => readerStateMachine(0, cancellationToken));
 
             return waitHandle;
-
-            //Block block = null;
-            //Action<int> compression = null;
-            //compression = state => {
-            //    switch (state) {
-            //        case 0:
-            //            _reader.ReadAsync(_block => {
-            //                block = _block;
-            //                _scheduler.ScheduleWorkItem(()=> compression(1), callback: null);
-            //            }, cancellationToken);
-            //            break;
-            //        case 1:
-            //            if (block.Index >= 0) {
-            //                int size;
-            //                byte[] data;
-            //                (size, data) = CompressBlock(block.Payload, block.Size, _compressionLevel);
-            //                block = new Block(block.Index, block.Capacity, data, size);
-            //            }
-
-            //            _scheduler.ScheduleWorkItem(() => compression(2), callback: null);
-            //            break;
-            //        case 2:
-            //            _scheduler.ScheduleWorkItem(() => { callback(block); }, callback: null);
-            //            break;
-            //    }
-            //};
-            
-            //return _scheduler.ScheduleWorkItem(() => {
-            //    compression(0);
-            //}, callback: null);
         }
 
         private static (int, byte[]) CompressBlock(byte[] data, int blockSize, CompressionLevel compression)

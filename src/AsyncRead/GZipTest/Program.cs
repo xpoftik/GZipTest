@@ -14,7 +14,7 @@ namespace GZipTest
         private bool _done = false;
 
         public static int Main(string[] args)
-            //=> CommandLineApplication.Execute<Program>(new string[] { "-m compress", "-t C:\\test\\test.txt", $"-o c:\\test\\{Guid.NewGuid().ToString()}.gz" });
+            //=> CommandLineApplication.Execute<Program>(new string[] { "-m compress", "-t C:\\test\\bigfile.txt", $"-o c:\\test\\{Guid.NewGuid().ToString()}.gz" });
             => CommandLineApplication.Execute<Program>(args);
 
         [Required]
@@ -65,19 +65,18 @@ namespace GZipTest
             //Console.WriteLine("Press 'Esc' to cancel the operation.");
             processing.Start();
 
-            while (!cls.IsCancellationRequested) {
-                if (_done) break;
+            //while (!cls.IsCancellationRequested) {
+            //    if (_done) break;
 
-                var key = Console.ReadKey();
-                if (key.Key == ConsoleKey.Escape 
-                    || ((key.Modifiers == ConsoleModifiers.Control)
-                         && key.Key == ConsoleKey.C)) {
-                    if (!_done) {
-                        cls.Cancel();
-                        Console.WriteLine("Operation cancelled.");
-                    }
-                }
-            }
+            //    var key = Console.ReadKey();
+            //    if (key.Key == ConsoleKey.Escape 
+            //        || ((key.Modifiers == ConsoleModifiers.Control)
+            //             && key.Key == ConsoleKey.C)) {
+            //        if (!_done) {
+            //            cls.Cancel();
+            //        }
+            //    }
+            //}
             processing.Join();
         }
 

@@ -48,7 +48,12 @@ namespace GZipTest.Arch
             Exception exception = null;
             readStateMachine = (state, token) => {
                 if (token.IsCancellationRequested) {
+
+                    Console.WriteLine("RERERERERERERER!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    RemoveAwaiter(waitHandle);
                     waitHandle.Set();
+
+                    callback(new OperationCancelledResult<Block>(waitHandle));
                     return;
                 }
 
@@ -90,8 +95,9 @@ namespace GZipTest.Arch
                 }
             };
 
+
+            StoreAwaiter(waitHandle); 
             _scheduler.ScheduleWorkItem(() => readStateMachine(0, cancellationToken), callback: null);
-            StoreAwaiter(waitHandle);
 
             return waitHandle;
         }

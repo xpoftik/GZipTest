@@ -26,14 +26,16 @@ namespace GZipTest.Arch
         //private object _schedulingLocker = new object();
         //private bool _isScheduling = false;
 
+        public int ThreadCount { get { return _threadPool.Count; } }
+
         private ConcurrentQueue<ThreadWrapper> _threadPool = new ConcurrentQueue<ThreadWrapper>();
         //We have to use queue to avoid cases cyclic performing rescheduled item!
         private Queue<Action> _queue = new Queue<Action>();
 
-        public SimpleAchScheduler(int threadsCount = 4, CancellationToken cancellationToken = default)
+        public SimpleAchScheduler(int threadsCount = 4/*, CancellationToken cancellationToken = default*/)
         {
-            InitThreadPool(threadsCount, cancellationToken);
-            BeginSchedulling(cancellationToken);
+            InitThreadPool(threadsCount/*, cancellationToken*/);
+            BeginSchedulling(/*cancellationToken*/);
         }
 
         public WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback)
@@ -81,23 +83,16 @@ namespace GZipTest.Arch
             }
         }
 
-        private void InitThreadPool(int initialCount, CancellationToken cancellationToken) {
+        private void InitThreadPool(int initialCount/*, CancellationToken cancellationToken*/) {
             for (int idx = 0; idx < initialCount; idx++) {
-                _threadPool.Enqueue(new ThreadWrapper(cancellationToken));
+                _threadPool.Enqueue(new ThreadWrapper(/*cancellationToken*/));
             }
         }
 
-        private void BeginSchedulling(CancellationToken cancellationToken)
+        private void BeginSchedulling(/*CancellationToken cancellationToken*/)
         {
             var schedulingThread = new Thread(() => {
                 while(true) {
-                    if (cancellationToken.IsCancellationRequested) {
-                        foreach(var thread in _threadPool) {
-                            _queue.Clear();
-                            thread.Pulse();
-                        }
-                        break;
-                    }
                     if(_stop) break;
 
                     if (_threadPool.Count > 0) {
@@ -121,14 +116,14 @@ namespace GZipTest.Arch
                         }
                     }
                 }
-                //Console.WriteLine("Scheduling thread terminated");
+                Console.WriteLine("Scheduling thread terminated");
             });
             schedulingThread.Start();
         }
 
         private void StopScheduling() {
             while (true) {
-                if (_requestCount > 0) continue;
+                if (_requestCount > 0 || _queue.Count > 0) continue;
                 break;
             }
             foreach (var thread in _threadPool) {
@@ -166,7 +161,7 @@ namespace GZipTest.Arch
             private AutoResetEvent _workAwaiter = new AutoResetEvent(initialState: false);
             private Action _workItem;
 
-            public ThreadWrapper(CancellationToken cancellationToken)
+            public ThreadWrapper()
             {
                 _targetThread = new Thread(() => {
                     while (true) {
@@ -174,12 +169,9 @@ namespace GZipTest.Arch
 
                         if (_disposed) break;
 
-                        // break the execution
-                        if (cancellationToken.IsCancellationRequested) break;
-
                         _workItem();
                     }
-                    //Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
+                    Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
                 });
                 _targetThread.Start();
             }
