@@ -14,7 +14,7 @@ namespace GZipTest
         private bool _done = false;
 
         public static int Main(string[] args)
-            => CommandLineApplication.Execute<Program>(args);
+            => CommandLineApplication.Execute<Program>(new string[] { "-m compress", "-t C:\\test\\test.txt", $"-o c:\\test\\{Guid.NewGuid().ToString()}.gz" });
 
         [Required]
         [Option(Description = "Compress/Decompress")]
@@ -58,9 +58,9 @@ namespace GZipTest
                     }
                 }
             });
+            Console.WriteLine("Press 'Esc' to cancel the operation.");
             processing.Start();
 
-            Console.WriteLine("Press 'Esc' to cancel the operation.");
             while (!cls.IsCancellationRequested) {
                 if (_done) break;
 
@@ -68,10 +68,14 @@ namespace GZipTest
                 if (key.Key == ConsoleKey.Escape 
                     || ((key.Modifiers == ConsoleModifiers.Control)
                          && key.Key == ConsoleKey.C)) {
-                    cls.Cancel();
-                    Console.WriteLine("Operation cancelled.");
+                    if (!_done) {
+                        cls.Cancel();
+                        Console.WriteLine("Operation cancelled.");
+                    }
                 }
             }
+            processing.Join();
+            Console.WriteLine("Done!");
         }
 
         private IArchProcess Compress(string target, string output, CancellationToken cancellationToken) {

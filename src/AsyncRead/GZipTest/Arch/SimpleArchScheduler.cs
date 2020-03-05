@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace GZipTest.Arch
 {
-    internal interface IArchScheduler
+    internal interface IArchScheduler: IDisposable
     {
         WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback);
         WaitHandle ScheduleWorkItem(Action workItem, Action callback = null);
@@ -18,9 +18,10 @@ namespace GZipTest.Arch
     /// It dequeues tasks from queue one by one and starts on one of available thread.
     /// 
     /// </summary>
-    internal sealed class SimpleAchScheduler : IArchScheduler {
+    internal sealed class SimpleAchScheduler : IArchScheduler, IDisposable {
 
         private object _locker = new object();
+        private int _requestCount = 0;
         //private object _schedulingLocker = new object();
         //private bool _isScheduling = false;
 
@@ -28,10 +29,10 @@ namespace GZipTest.Arch
         //We have to use queue to avoid cases cyclic performing rescheduled item!
         private Queue<Action> _queue = new Queue<Action>();
 
-        public SimpleAchScheduler(int threadsCount = 4)
+        public SimpleAchScheduler(int threadsCount = 4, CancellationToken cancellationToken = default)
         {
-            InitThreadPool(threadsCount);
-            BeginSchedulling();
+            InitThreadPool(threadsCount, cancellationToken);
+            BeginSchedulling(cancellationToken);
         }
 
         public WaitHandle ScheduleWorkItem<T>(Func<T> workItem, Action<T> callback)
@@ -79,18 +80,25 @@ namespace GZipTest.Arch
             }
         }
 
-        private void InitThreadPool(int initialCount) {
+        private void InitThreadPool(int initialCount, CancellationToken cancellationToken) {
             for (int idx = 0; idx < initialCount; idx++) {
-                _threadPool.Enqueue(new ThreadWrapper());
+                _threadPool.Enqueue(new ThreadWrapper(cancellationToken));
             }
         }
 
-        private void BeginSchedulling()
+        private void BeginSchedulling(CancellationToken cancellationToken)
         {
             var schedulingThread = new Thread(() => {
                 while(true) {
+                    if (cancellationToken.IsCancellationRequested) {
+                        foreach(var thread in _threadPool) {
+                            _queue.Clear();
+                            thread.Pulse();
+                        }
+                    }
                     if (_threadPool.Count > 0) {
                         if(TryDequeueNextWorkItem(out Action nextItem)) {
+                            Interlocked.Increment(ref _requestCount);
                             if(_threadPool.TryDequeue(out ThreadWrapper thread)) {
                                 //Console.Write($"\r Queue length: {_queue.Count}");
                                 Action nextItemWrapper = () => {
@@ -98,6 +106,7 @@ namespace GZipTest.Arch
                                         nextItem();
                                     }
                                     finally {
+                                        Interlocked.Decrement(ref _requestCount);
                                         _threadPool.Enqueue(thread);
                                     }
                                 };
@@ -110,6 +119,17 @@ namespace GZipTest.Arch
                 }
             });
             schedulingThread.Start();
+        }
+
+        private void StopScheduling() {
+            while (true) {
+                if (_requestCount > 0) continue;
+                break;
+            }
+            foreach (var thread in _threadPool) {
+                thread.Dispose();
+            }
+            _threadPool.Clear();
         }
 
         private bool TryDequeueNextWorkItem(out Action action)
@@ -129,26 +149,49 @@ namespace GZipTest.Arch
             return action != null;
         }
 
-        private sealed class ThreadWrapper {
+        public void Dispose() {
+            StopScheduling();
+        }
 
+        private sealed class ThreadWrapper: IDisposable {
+
+            private bool _disposed = false;
             private Thread _targetThread;
             private AutoResetEvent _workAwaiter = new AutoResetEvent(initialState: false);
             private Action _workItem;
 
-            public ThreadWrapper()
+            public ThreadWrapper(CancellationToken cancellationToken)
             {
                 _targetThread = new Thread(() => {
                     while (true) {
                         _workAwaiter.WaitOne();
 
+                        if (_disposed) break;
+
+                        // break the execution
+                        if (cancellationToken.IsCancellationRequested) break;
+
                         _workItem();
                     }
+                    Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
                 });
                 _targetThread.Start();
             }
 
             public void Start(Action workItem) {
                 _workItem = workItem;
+                _workAwaiter.Set();
+            }
+
+            public void Dispose() {
+                _disposed = true;
+                Pulse();
+                _targetThread.Join();
+            }
+
+            internal void Pulse()
+            {
+                _workItem = () => { };
                 _workAwaiter.Set();
             }
         }

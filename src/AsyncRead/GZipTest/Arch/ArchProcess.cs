@@ -159,6 +159,7 @@ namespace GZipTest.Arch
 
             _reader.Dispose();
             _writer.Dispose();
+            _scheduler.Dispose();
 
             if (IsCancelled) {
                 return ArchResult.Cancelled();
