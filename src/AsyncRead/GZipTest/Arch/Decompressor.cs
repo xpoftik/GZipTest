@@ -25,16 +25,14 @@ namespace GZipTest.Arch
         }
 
         private readonly IReader<Block> _reader;
-        private readonly CompressionLevel _compressionLevel;
         private readonly IArchScheduler _scheduler;
 
-        public Decompressor(IReader<Block> reader, CompressionLevel compressionLevel, IArchScheduler archScheduler)
+        public Decompressor(IReader<Block> reader, IArchScheduler archScheduler)
         {
             ThrowIf.Argument.IsNull(reader, nameof(reader));
             ThrowIf.Argument.IsNull(archScheduler, nameof(archScheduler));
 
             _reader = reader;
-            _compressionLevel = compressionLevel;
             _scheduler = archScheduler;
         }
 
@@ -44,7 +42,7 @@ namespace GZipTest.Arch
 
             Action<States, CancellationToken> readerStateMachine = null;
             Block block = null;
-            Block compressedBlock = null;
+            Block decompressedBlock = null;
             Exception exception = null;
             readerStateMachine = (state, token) => {
                 if (token.IsCancellationRequested) {
@@ -76,17 +74,17 @@ namespace GZipTest.Arch
                         try {
                             int size;
                             byte[] data;
-                            (size, data) = DecompressBlock(block.Payload, block.Size, _compressionLevel);
-                            compressedBlock = new Block(block.Index, block.Capacity, data, size);
+                            (size, data) = DecompressBlock(block.Payload, block.Size);
+                            decompressedBlock = new Block(block.Index, block.Capacity, data, size);
 
                             _scheduler.ScheduleWorkItem(() => readerStateMachine(States.Success, token));
                         } catch (Exception ex) {
-                            exception = ex;
+                            exception = new Exception($"BlockIndex: {block.Index}, capacity: {block.Capacity}, size: {block.Size}", ex);
                             _scheduler.ScheduleWorkItem(() => readerStateMachine(States.Error, token));
                         }
                         break;
                     case States.Success: // success
-                        callback(new ValueResult<Block>(compressedBlock, waitHandle));
+                        callback(new ValueResult<Block>(decompressedBlock, waitHandle));
                         _scheduler.ScheduleWorkItem(() => readerStateMachine(States.Finalize, CancellationToken.None));
                         break;
                     case States.Error: // error
@@ -103,47 +101,24 @@ namespace GZipTest.Arch
             return waitHandle;
         }
 
-        private static (int, byte[]) DecompressBlock(byte[] data, int blockSize, CompressionLevel compression)
-        {
+        private (int, byte[]) DecompressBlock(byte[] data, int blockSize) {
             if (data.Length != blockSize) {
                 data = data.Take(blockSize).ToArray();
             }
-            using (var source = new MemoryStream(data)) {
-                using (var compressed = new MemoryStream()) {
-                    //compression
-                    using (var compressor = new GZipStream(compressed, compression, leaveOpen: true)) {
-                        byte[] buffer = new byte[Environment.SystemPageSize];
-                        int readBytes;
-                        while ((readBytes = source.Read(buffer, offset: 0, buffer.Length)) > 0) {
-                            compressor.Write(buffer, offset: 0, count: readBytes);
+            using (var outputStream = new MemoryStream()) {
+                using (var source = new MemoryStream(data)) {
+                    using (var decompressor = new GZipStream(source, CompressionMode.Decompress, leaveOpen: true)) {
+                        var buffer = new byte[1024 * 1024];
+                        var readBytes = 0;
+                        while ((readBytes = decompressor.Read(buffer, 0, buffer.Length)) > 0) {
+                            outputStream.Write(buffer, 0, readBytes);
                         }
                     }
-
-                    var outputArray = compressed.ToArray();
-                    return (outputArray.Length, outputArray);
                 }
-            }
-        }
+                outputStream.Flush();
 
-        private static (int, byte[]) CompressBlock(byte[] data, int blockSize, CompressionLevel compression)
-        {
-            if (data.Length != blockSize) {
-                data = data.Take(blockSize).ToArray();
-            }
-            using (var source = new MemoryStream(data)) {
-                using (var compressed = new MemoryStream()) {
-                    //compression
-                    using (var compressor = new GZipStream(compressed, compression, leaveOpen: true)) {
-                        byte[] buffer = new byte[Environment.SystemPageSize];
-                        int readBytes;
-                        while ((readBytes = source.Read(buffer, offset: 0, buffer.Length)) > 0) {
-                            compressor.Write(buffer, offset: 0, count: readBytes);
-                        }
-                    }
-
-                    var outputArray = compressed.ToArray();
-                    return (outputArray.Length, outputArray);
-                }
+                var outputArray = outputStream.ToArray();
+                return (outputArray.Length, outputArray);
             }
         }
 

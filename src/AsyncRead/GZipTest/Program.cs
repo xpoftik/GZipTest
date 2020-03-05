@@ -65,17 +65,83 @@ namespace GZipTest
             //    break;
             //}
 
+
+
+            //// DECOMPRESSION TEST
+            //var cls = new CancellationTokenSource();
+            //var scheduler = new SimpleAchScheduler(threadsCount: 8);
+
+            //var stopwatch = new Stopwatch();
+            //stopwatch.Start();
+            //while (true) {
+            //    var filename = Path.Combine("C:\\test", "test.gz");
+            //    var decompressorReader = new DecompressorReader(filename, scheduler);
+            //    var bufferReader = new BufferReader(decompressorReader, Consts.DEFAULT_BUFFER_SIZE_LIMIT, scheduler);
+
+            //    var _reader = bufferReader;
+            //    bool stop = false;
+            //    try {
+            //        while (!stop) {
+            //            var w1 = _reader.ReadAsync(block => {
+            //                try{
+            //                    if(!stop && block.Result.Index == -1) {
+            //                        stop = true;
+            //                    }
+            //                    Console.WriteLine($"\r{block.Result.Index} (Size: {block.Result.Size}) ThreadId: {Thread.CurrentThread.ManagedThreadId}");
+            //                } catch(Exception ex) {
+            //                    Console.WriteLine(ex.Message);
+            //                    cls.Cancel();
+            //                }
+            //            }, cls.Token);
+            //            var w2 = _reader.ReadAsync(block => { Console.Write($"\r{block.Result.Index} (Size: {block.Result.Size}) ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cls.Token);
+            //            var w3 = _reader.ReadAsync(block => { Console.Write($"\r{block.Result.Index} (Size: {block.Result.Size}) ThreadId: {Thread.CurrentThread.ManagedThreadId}"); }, cls.Token);
+
+            //            WaitHandle.WaitAll(new WaitHandle[] { w1, w2, w3 });
+            //        }
+            //    } catch (Exception ex) {
+            //        while (ex != null) {
+            //            Console.WriteLine(ex);
+            //            ex = ex.InnerException;
+            //        }
+            //        cls.Cancel();
+            //    } finally {
+            //        _reader.Dispose();
+            //    }
+            //    Console.WriteLine("\r\n\r\n");
+            //    Console.WriteLine($"Done! {stopwatch.Elapsed.Minutes} min. {stopwatch.Elapsed.Seconds} sec.");
+            //    stopwatch.Restart();
+
+            //    break;
+            //}
+
+
+
+
+
             var cls = new CancellationTokenSource();
             var arch = new Archiver();
 
-            var target = Path.Combine("C:\\test", "test.txt");
-            var output = Path.Combine("C:\\test", $"{Guid.NewGuid().ToString()}.gz");
+            //var target = Path.Combine("C:\\test", "bigfile.txt");
+            //var output = Path.Combine("C:\\test", $"{Guid.NewGuid().ToString()}.gz");
 
-            var process = arch.CompressAsync(target, output, cls.Token);
-            var result = process.Result;
+            //var compressProcess = arch.CompressAsync(target, output, cls.Token);
+            //var result = compressProcess.Result;
+
+            //Console.WriteLine($"{result.Status} ({result.Message})");
+
+            var target = Path.Combine("C:\\test", "bigtest.gz");
+            var decompressed = Path.Combine("C:\\test", $"{Guid.NewGuid()}_decompressed.txt");
+
+            var decompressProcess = arch.DepompressAsync(target, decompressed, cls.Token);
+            var result = decompressProcess.Result;
 
             Console.WriteLine($"{result.Status} ({result.Message})");
             Console.WriteLine("Done!");
+
+
+
+
+
 
 
 

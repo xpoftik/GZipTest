@@ -9,11 +9,9 @@ namespace GZipTest.Arch
 {
     internal sealed class Archiver
     {
-        public Archiver()
-        {
-        }
-
         public IArchProcess CompressAsync(string target, string output, CancellationToken cancellationToken) {
+
+
             var scheduler = new SimpleAchScheduler(threadsCount: Environment.ProcessorCount);
 
             var reader = new FileReader(target, scheduler);
@@ -29,7 +27,17 @@ namespace GZipTest.Arch
         }
 
         public IArchProcess DepompressAsync(string target, string output, CancellationToken cancellationToken) {
-            throw new NotImplementedException();
+            var scheduler = new SimpleAchScheduler(threadsCount: Environment.ProcessorCount);
+
+            var decompressor = new DecompressorReader(target, scheduler);
+            var bufferReader = new BufferReader(decompressor, Consts.DEFAULT_BUFFER_SIZE_LIMIT, scheduler);
+
+            var writer = new FileWriter(output, scheduler);
+
+            var process = new ArchProcess(bufferReader, writer, scheduler);
+            process.Start(cancellationToken);
+
+            return process;
         }
         
     }

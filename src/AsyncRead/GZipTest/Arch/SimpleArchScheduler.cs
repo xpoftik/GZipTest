@@ -12,6 +12,12 @@ namespace GZipTest.Arch
         WaitHandle ScheduleWorkItem(Action workItem, Action callback = null);
     }
 
+    /// <summary>
+    /// Simple scheduler.
+    /// Just has thread pool and tasks queue. 
+    /// It dequeues tasks from queue one by one and starts on one of available thread.
+    /// 
+    /// </summary>
     internal sealed class SimpleAchScheduler : IArchScheduler {
 
         private object _locker = new object();
