@@ -64,19 +64,6 @@ namespace GZipTest
             });
             //Console.WriteLine("Press 'Esc' to cancel the operation.");
             processing.Start();
-
-            //while (!cls.IsCancellationRequested) {
-            //    if (_done) break;
-
-            //    var key = Console.ReadKey();
-            //    if (key.Key == ConsoleKey.Escape 
-            //        || ((key.Modifiers == ConsoleModifiers.Control)
-            //             && key.Key == ConsoleKey.C)) {
-            //        if (!_done) {
-            //            cls.Cancel();
-            //        }
-            //    }
-            //}
             processing.Join();
         }
 

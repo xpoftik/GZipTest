@@ -161,7 +161,7 @@ namespace GZipTest.Arch
             _writer.Dispose();
             _scheduler.Dispose();
 
-            Console.WriteLine($"Thread count: {((SimpleAchScheduler)_scheduler).ThreadCount}");
+            //Console.WriteLine($"Thread count: {((SimpleAchScheduler)_scheduler).ThreadCount}");
 
             if (IsCancelled) {
                 return ArchResult.Cancelled();

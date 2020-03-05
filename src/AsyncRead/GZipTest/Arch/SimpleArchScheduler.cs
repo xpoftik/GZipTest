@@ -116,7 +116,7 @@ namespace GZipTest.Arch
                         }
                     }
                 }
-                Console.WriteLine("Scheduling thread terminated");
+                //Console.WriteLine("Scheduling thread terminated");
             });
             schedulingThread.Start();
         }
@@ -171,7 +171,7 @@ namespace GZipTest.Arch
 
                         _workItem();
                     }
-                    Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
+                    //Console.WriteLine($"ThreadId: {Thread.CurrentThread.ManagedThreadId} terminated.");
                 });
                 _targetThread.Start();
             }
