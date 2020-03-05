@@ -11,8 +11,6 @@ namespace GZipTest
 {
     internal class Program
     {
-        private bool _done = false;
-
         public static int Main(string[] args)
             //=> CommandLineApplication.Execute<Program>(new string[] { "-m compress", "-t C:\\test\\bigfile.txt", $"-o c:\\test\\{Guid.NewGuid().ToString()}.gz" });
             => CommandLineApplication.Execute<Program>(args);
@@ -53,8 +51,6 @@ namespace GZipTest
                     if(result.Status == 1) { // error
                         Console.WriteLine(result.Message);
                     }
-
-                    _done = true;
                 } catch(Exception ex) {
                     while (ex != null) {
                         Console.WriteLine(ex);
@@ -62,7 +58,6 @@ namespace GZipTest
                     }
                 }
             });
-            //Console.WriteLine("Press 'Esc' to cancel the operation.");
             processing.Start();
             processing.Join();
         }
